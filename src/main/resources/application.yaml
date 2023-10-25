@@ -1,0 +1,40 @@
+logging:
+  level:
+    org.springframework.cloud.gateway: TRACE
+    #    reactor.netty.http: DEBUG
+#    reactor.netty: TRACE
+  endpoint:
+    gateway:
+      enabled: true
+    web:
+      exposure:
+        include: "*"
+management:
+  endpoint:
+    health:
+      show-details: when_authorized
+    gateway:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  server:
+    port: 8080
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: test
+          uri: "http://httpbin.org"
+          predicates:
+            - Path=/test/**
+          filters:
+            - StripPrefix=1
+#            - CustomAuthorization=42
+        - id: test2
+          uri: "http://httpbin.org"
+          predicates:
+            - Path=/test2/**
+          filters:
+            - StripPrefix=1
