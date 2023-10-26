@@ -1,0 +1,67 @@
+= Spring Cloud Gateway Security Filter
+
+== Example
+
+The example has Spring Cloud Gateway filter wrapped in Spring Security chain.
+This model takes advantage of the Spring Security infrastructure to provide the following advantages:
+
+* Stores Authentication information in the Security context.
+Allowing access to it from other filters using `ReactiveSecurityContextHolder`.
+* Enforces best practices to organize code.
+
+** Reading and authenticating (aka. validating) the credentials is split in 2 components:
+*** AuthenticationConverter: processes HTTP request to extract any required information (does not validate).
+*** AuthenticationManager: validates the credentials previously extracted.
+
+** Error handing is isolated:
+*** ServerAccessDeniedHandler: (configured via `exceptionHandling` method) handles response in case the request is not authenticated.
+It can be extracted into a class if ones to organize the code.
+In the example, it's embeded as a lambda for simplicity
+
+** Credentials and user information is decoupled from transfer protocol: no need to deal with HTTP elements once the `Authentication object is created in the `AuthenticationConverter`.
+** Logic is clearly separated in Spring Cloud Gateway and Spring Security components, making the security part reusable for other Spring Boot apps.
+
+
+This is not free however, the downsides however are:
+
+* Coupling with Spring Security components: this can be mitigated using Delegator pattern.
+Some is shown in the example, see how `CookieAuthenticationConverter` delegates most of the logic to AuthCookieParser.
+Likewise, validation/authentication logic could be extracted into an independent class instead of being embedded in `CookieAuthenticationManager`.
+* Steeper learning curve: some knowledge of how Spring Security chains work is necessary.
+
+== Running the example
+
+The filter expects a cookie names `auth-cookie` containing a Base64 encoded JSON content with some properties.
+
+.JSON content example
+ {"username":"me","session-id":"123","issued-at":"2023-10-26T20:16:00.000","ttl":"24h"}
+
+
+Simply, start the application `DemoGatewayApplication` and use one of the following curl calls:
+
+.Complete cURL call example
+ curl --cookie "auth-cookie=eyJ1c2VybmFtZSI6Im1lIiwic2Vzc2lvbi1pZCI6IjEyMyIsImlzc3VlZC1hdCI6IjIwMjMtMTAtMjZUMjA6MTY6MDAuMDAwIiwidHRsIjoiMjRoIn0=" \
+http://localhost:8080/test/get -v
+
+This call responds with a successful status `200 OK` given the token hasn't expire
+
+.Example of expired
+ curl --cookie "auth-cookie=eyJ1c2VybmFtZSI6Im1lIiwic2Vzc2lvbi1pZCI6IjEyMyIsImlzc3VlZC1hdCI6IjIwMjMtMTAtMjZUMjA6MTY6MDAuMDAwIiwidHRsIjoiMTBzIn0=" \
+http://localhost:8080/test/get -v
+
+
+== Advanced
+
+The example does not handle redirections automatically.
+Those will need to be handled in the `exceptionHandling` setting status and `Location` manually.
+
+If one wants to handle them automatically, it's possible to use `formLogin` to automate it.
+
+[,java]
+----
+.formLogin(formLoginSpec ->  {
+    formLoginSpec
+            .loginPage("/url/to-redirect")
+            .authenticationManager(authenticationManager);
+})
+----

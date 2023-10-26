@@ -31,10 +31,14 @@ spring:
             - Path=/test/**
           filters:
             - StripPrefix=1
-#            - CustomAuthorization=42
+            - CustomAuthorization=42
         - id: test2
           uri: "http://httpbin.org"
           predicates:
             - Path=/test2/**
           filters:
             - StripPrefix=1
+
+filter:
+  cookie:
+    decrypt-key: c2VjcmV0
