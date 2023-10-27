@@ -13,30 +13,35 @@ class CookieAuthentication extends AbstractAuthenticationToken {
 
 
     // We could make AuthCookie directly extend AbstractAuthenticationToken
-    private AuthCookie cookie;
+    private AuthCookie authCookie;
+
+    private ProfileCookie profileCookie;
 
 
-    public CookieAuthentication() {
+    public CookieAuthentication(AuthCookie authCookie, ProfileCookie profileCookie) {
         super(List.of());
-        this.cookie = null;
+        this.authCookie = authCookie;
+        this.profileCookie = profileCookie;
     }
-
-    public CookieAuthentication(AuthCookie cookie) {
-        super(List.of());
-        this.cookie = cookie;
-    }
-
     /**
      * Simple implementation directly storing the cookie.
      * Something
      */
     @Override
     public Object getCredentials() {
-        return cookie;
+        return authCookie;
     }
 
     @Override
     public Object getPrincipal() {
-        return cookie;
+        return authCookie;
+    }
+
+    public AuthCookie getAuthCookie() {
+        return authCookie;
+    }
+
+    public ProfileCookie getProfileCookie() {
+        return profileCookie;
     }
 }

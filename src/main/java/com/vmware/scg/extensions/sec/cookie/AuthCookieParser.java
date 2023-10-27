@@ -2,6 +2,7 @@ package com.vmware.scg.extensions.sec.cookie;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vmware.scg.extensions.sec.ProfileCookie;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.convert.DurationStyle;
 import org.springframework.stereotype.Component;

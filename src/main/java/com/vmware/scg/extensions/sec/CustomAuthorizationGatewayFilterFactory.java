@@ -1,6 +1,7 @@
 package com.vmware.scg.extensions.sec;
 
 
+import com.vmware.scg.extensions.sec.cookie.AuthCookie;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,11 +12,12 @@ import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.WebFilterChainProxy;
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
@@ -37,10 +39,26 @@ public class CustomAuthorizationGatewayFilterFactory
         this.authenticationManager = authenticationManager;
     }
 
+
+    private WebClient webClient;
+
     @Override
     public GatewayFilter apply(Config config) {
 
         var authenticationWebFilter = authenticationWebFilter();
+
+        ReactiveSecurityContextHolder.getContext()
+                .map(securityContext -> {
+                    CookieAuthentication authentication = (CookieAuthentication)securityContext.getAuthentication();
+                    AuthCookie credentials = (AuthCookie)authentication.getCredentials();
+
+                    String sessionId = credentials.getSessionId();
+
+
+                });
+
+
+
 
         // Use Spring Security DLS builder:
         //  * Disable unnecessary pieces
@@ -53,9 +71,17 @@ public class CustomAuthorizationGatewayFilterFactory
                 .csrf(csrfSpec -> csrfSpec.disable())
                 .logout(logoutSpec -> logoutSpec.disable())
                 .addFilterBefore(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-                .authorizeExchange(authorizeExchangeSpec -> authorizeExchangeSpec.anyExchange().authenticated())
+                .authorizeExchange(authorizeExchangeSpec -> {
+                    authorizeExchangeSpec
+                            .anyExchange().hasAuthority("APP_ALLOWED_"+config.id)
+                            .anyExchange().authenticated();
+                })
+
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
                                 .accessDeniedHandler((exchange, denied) -> {
+                                    // TODO check if exception from manager is wrapper in AccessDenied
+                                    //   denied.getCause();
+
                                     ServerHttpResponse response = exchange.getResponse();
                                     // For example only, `Location` should come with status 302
                                     response.setRawStatusCode(600);
@@ -63,6 +89,7 @@ public class CustomAuthorizationGatewayFilterFactory
                                     // Customizing the response
                                     DataBufferFactory dataBufferFactory = response.bufferFactory();
                                     DataBuffer wrap = dataBufferFactory.wrap("error message".getBytes(StandardCharsets.UTF_8));
+
                                     return response.writeWith(Mono.just(wrap));
                                 })
                 )
@@ -70,7 +97,19 @@ public class CustomAuthorizationGatewayFilterFactory
 
         log.info("CustomAuthorizationGatewayFilterFactory securityChain configured");
 
-        return (exchange, chain) -> new WebFilterChainProxy(securityChain).filter(exchange, chain::filter);
+//        return (exchange, chain) -> new WebFilterChainProxy(securityChain).filter(exchange, chain::filter);
+        return (exchange, chain) -> {
+
+            // Passi Extension
+            String passiSessionId= "1234567890";
+            exchange.getAttributes().put("PASSI_SESSION", passiSessionId);
+
+            // Pre-Filter or Post-Filter
+            String passiSession = (String) exchange.getAttributes().get("PASSI_SESSION");
+
+
+            return
+        };
     }
 
     private AuthenticationWebFilter authenticationWebFilter() {

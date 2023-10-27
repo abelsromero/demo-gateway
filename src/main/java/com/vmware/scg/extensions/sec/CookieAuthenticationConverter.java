@@ -2,6 +2,7 @@ package com.vmware.scg.extensions.sec;
 
 import com.vmware.scg.extensions.sec.cookie.AuthCookie;
 import com.vmware.scg.extensions.sec.cookie.AuthCookieParser;
+import com.vmware.scg.extensions.sec.cookie.ProfileCookieParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpCookie;
@@ -20,10 +21,12 @@ class CookieAuthenticationConverter implements ServerAuthenticationConverter {
 
     private static final String COOKIE_NAME = "auth-cookie";
 
-    private final AuthCookieParser cookieParser;
+    private final AuthCookieParser authCookieParser;
+    private final ProfileCookieParser profileCookieParser;
 
-    public CookieAuthenticationConverter(AuthCookieParser cookieParser) {
-        this.cookieParser = cookieParser;
+    public CookieAuthenticationConverter(AuthCookieParser cookieParser, ProfileCookieParser profileCookieParser) {
+        this.authCookieParser = cookieParser;
+        this.profileCookieParser = profileCookieParser;
     }
 
     // Create Authentication token that represents a request to authenticate, not the actual validated context.
@@ -41,7 +44,8 @@ class CookieAuthenticationConverter implements ServerAuthenticationConverter {
 
         final HttpCookie httpCookie = httpCookies.get(0);
 
-        AuthCookie authCookie = cookieParser.parse(httpCookie.getValue());
+        AuthCookie authCookie = authCookieParser.parse(httpCookie.getValue());
+        ProfileCookie profileCookie = profileCookieParser.parse(httpCookie.getValue());
 
         // Initial cookie validations can be done here, but by definition, the `ServerAuthenticationConverter`.
         // If decryption is considered part of the validation, that is, a cookie is valid
@@ -50,10 +54,10 @@ class CookieAuthenticationConverter implements ServerAuthenticationConverter {
         //    - the first, holds the encrypted value as-is, and passes it to the ReactiveAuthenticationManager implementation
         //    - the second, represents a valid validated (hence, authenticated) Authentication and is the return from ReactiveAuthenticationManager
 
-        return Mono.just(new CookieAuthentication(authCookie));
+        return Mono.just(new CookieAuthentication(authCookie, profileCookie));
     }
 
     private Authentication unauthenticatedToken() {
-        return new CookieAuthentication();
+        return new CookieAuthentication(null,null);
     }
 }
