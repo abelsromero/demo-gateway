@@ -4,14 +4,11 @@ import com.vmware.scg.extensions.sec.cookie.AuthCookie;
 import com.vmware.scg.extensions.sec.cookie.CookieValidationService;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -26,28 +23,29 @@ class CookieAuthenticationManager implements ReactiveAuthenticationManager {
     // Responsible for validating (hence marking the AuthenticationToken as authenticated)
     @Override
     public Mono<Authentication> authenticate(Authentication authentication) {
-        CookieAuthentication cookieAuthentication = (CookieAuthentication) authentication;
-
-        var authCookie =  ((CookieAuthentication) authentication).getAuthCookie();
+        var authCookie = ((CookieAuthentication) authentication).getAuthCookie();
         var profileCookie = ((CookieAuthentication) authentication).getProfileCookie();
 
         boolean authenticated = validate(authCookie, profileCookie);
-        authentication.setAuthenticated(authenticated);
 
         // Extract allowed applications from profile cookie and build authorities
         if (authenticated) {
-            List<GrantedAuthority> collect = profileCookie.getAllowedAppsId()
+            final var authorities = profileCookie.getAllowedAppsId()
                     .stream()
-                    .map(appId -> new SimpleGrantedAuthority("APP_ALLOWED" + appId))
-                    .collect(Collectors.toList());
+                    .map(appId -> new SimpleGrantedAuthority("APP_ALLOWED_" + appId))
+                    .collect(Collectors.toSet());
 
-            Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-            authorities.addAll(collect);
+            // Cannot modify (use 'addAll') because default implementation is immutable
+            //   authorities.addAll(authorities);
+            CookieAuthentication finalAuthentication = new CookieAuthentication(authCookie, profileCookie, authorities);
+            finalAuthentication.setAuthenticated(true);
+            return Mono.just(finalAuthentication);
         }
 
-        return Mono.error(new NullPointerException(""));
-
-//        return Mono.just(authentication);
+        authentication.setAuthenticated(false);
+        return Mono.just(authentication);
+        // Cannot throw exceptions: causes error 500
+        //   return Mono.error(new IllegalArgumentException("Something is wrong"));
     }
 
     private boolean validate(AuthCookie authCookie, ProfileCookie profileCookie) {
@@ -57,7 +55,8 @@ class CookieAuthenticationManager implements ReactiveAuthenticationManager {
         return hasRequiredData(authCookie)
                 && !hasExpired(authCookie)
                 // Third-party validations can be implemented in decoupled beans
-                && validationService.isSessionUnique(authCookie.getSessionId());
+                && validationService.isSessionUnique(authCookie.getSessionId())
+                && !profileCookie.getAllowedAppsId().isEmpty();
     }
 
     private static boolean hasExpired(AuthCookie authCookie) {

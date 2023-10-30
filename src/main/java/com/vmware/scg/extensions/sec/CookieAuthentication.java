@@ -3,7 +3,9 @@ package com.vmware.scg.extensions.sec;
 
 import com.vmware.scg.extensions.sec.cookie.AuthCookie;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -23,6 +25,13 @@ class CookieAuthentication extends AbstractAuthenticationToken {
         this.authCookie = authCookie;
         this.profileCookie = profileCookie;
     }
+
+    public CookieAuthentication(AuthCookie authCookie, ProfileCookie profileCookie, Collection<? extends GrantedAuthority> authorities) {
+        super(authorities);
+        this.authCookie = authCookie;
+        this.profileCookie = profileCookie;
+    }
+
     /**
      * Simple implementation directly storing the cookie.
      * Something

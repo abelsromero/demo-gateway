@@ -1,7 +1,6 @@
 package com.vmware.scg.extensions.sec;
 
 
-import com.vmware.scg.extensions.sec.cookie.AuthCookie;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,8 +11,8 @@ import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.WebFilterChainProxy;
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -47,17 +46,17 @@ public class CustomAuthorizationGatewayFilterFactory
 
         var authenticationWebFilter = authenticationWebFilter();
 
-        ReactiveSecurityContextHolder.getContext()
-                .map(securityContext -> {
-                    CookieAuthentication authentication = (CookieAuthentication)securityContext.getAuthentication();
-                    AuthCookie credentials = (AuthCookie)authentication.getCredentials();
-
-                    String sessionId = credentials.getSessionId();
-
-
-                });
-
-
+        /**
+         * In other filters, the Authentication can be retrieved from the Security Context:
+         *         ReactiveSecurityContextHolder.getContext()
+         *                 .map(securityContext -> {
+         *                     CookieAuthentication authentication = (CookieAuthentication)securityContext.getAuthentication();
+         *                     AuthCookie credentials = (AuthCookie)authentication.getCredentials();
+         *
+         *                     String sessionId = credentials.getSessionId();
+         *
+         *                 });
+         */
 
 
         // Use Spring Security DLS builder:
@@ -73,43 +72,37 @@ public class CustomAuthorizationGatewayFilterFactory
                 .addFilterBefore(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(authorizeExchangeSpec -> {
                     authorizeExchangeSpec
-                            .anyExchange().hasAuthority("APP_ALLOWED_"+config.id)
-                            .anyExchange().authenticated();
+                            // TODO authority implies authenticated, or alternatively for complex scenarios, you can use `.access()`
+                            //
+                            //            .anyExchange().access((authentication, object) -> authentication.map(auth -> auth.isAuthenticated()
+                            //                    && auth.getAuthorities().stream()
+                            //                    .map(GrantedAuthority::getAuthority)
+                            //                    .anyMatch(authority -> authority.equals("APP_ALLOWED_" + config.id)))
+                            //                    .map(granted -> new AuthorizationDecision(granted)))
+                            .anyExchange().hasAuthority("APP_ALLOWED_" + config.id);
                 })
 
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
-                                .accessDeniedHandler((exchange, denied) -> {
-                                    // TODO check if exception from manager is wrapper in AccessDenied
-                                    //   denied.getCause();
+                        .accessDeniedHandler((exchange, denied) -> {
+                            // TODO check if exception from manager is wrapper in AccessDenied
+                            //   denied.getCause();
 
-                                    ServerHttpResponse response = exchange.getResponse();
-                                    // For example only, `Location` should come with status 302
-                                    response.setRawStatusCode(600);
-                                    response.getHeaders().setLocation(URI.create("/url/to-redirect"));
-                                    // Customizing the response
-                                    DataBufferFactory dataBufferFactory = response.bufferFactory();
-                                    DataBuffer wrap = dataBufferFactory.wrap("error message".getBytes(StandardCharsets.UTF_8));
+                            ServerHttpResponse response = exchange.getResponse();
+                            // For example only, `Location` should come with status 302
+                            response.setRawStatusCode(600);
+                            response.getHeaders().setLocation(URI.create("/url/to-redirect"));
+                            // Customizing the response
+                            DataBufferFactory dataBufferFactory = response.bufferFactory();
+                            DataBuffer wrap = dataBufferFactory.wrap("error message".getBytes(StandardCharsets.UTF_8));
 
-                                    return response.writeWith(Mono.just(wrap));
-                                })
+                            return response.writeWith(Mono.just(wrap));
+                        })
                 )
                 .build();
 
         log.info("CustomAuthorizationGatewayFilterFactory securityChain configured");
 
-//        return (exchange, chain) -> new WebFilterChainProxy(securityChain).filter(exchange, chain::filter);
-        return (exchange, chain) -> {
-
-            // Passi Extension
-            String passiSessionId= "1234567890";
-            exchange.getAttributes().put("PASSI_SESSION", passiSessionId);
-
-            // Pre-Filter or Post-Filter
-            String passiSession = (String) exchange.getAttributes().get("PASSI_SESSION");
-
-
-            return
-        };
+        return (exchange, chain) -> new WebFilterChainProxy(securityChain).filter(exchange, chain::filter);
     }
 
     private AuthenticationWebFilter authenticationWebFilter() {

@@ -2,14 +2,11 @@ package com.vmware.scg.extensions.sec.cookie;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vmware.scg.extensions.sec.ProfileCookie;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.convert.DurationStyle;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,15 +14,15 @@ import java.util.Map;
 public class AuthCookieParser {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private final String decryptKey;
 
-    // Inject configurations wt
-    AuthCookieParser(@Value("${filter.cookie.decrypt-key}") String decryptKey) {
-        this.decryptKey = decryptKey;
+    private final CookieDecrypter cookieDecrypter;
+
+    public AuthCookieParser(CookieDecrypter cookieDecrypter) {
+        this.cookieDecrypter = cookieDecrypter;
     }
 
     public AuthCookie parse(String rawCookie) {
-        final String decryptedCookie = decrypt(rawCookie);
+        final String decryptedCookie = cookieDecrypter.decrypt(rawCookie);
         // Do stuff
         final Map<String, String> values = extractValues(decryptedCookie);
         String username = values.get("username");
@@ -45,12 +42,5 @@ public class AuthCookieParser {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    // Ideally split the decryption logic into a class if logic or configuration is more complex than a few lines
-    private String decrypt(String rawCookie) {
-        // do stuff
-        byte[] decoded = Base64.getDecoder().decode(rawCookie);
-        return new String(decoded);
     }
 }
