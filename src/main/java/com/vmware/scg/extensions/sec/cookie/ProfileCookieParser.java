@@ -2,39 +2,34 @@ package com.vmware.scg.extensions.sec.cookie;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.boot.convert.DurationStyle;
+import com.vmware.scg.extensions.sec.ProfileCookie;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
-public class AuthCookieParser {
+public class ProfileCookieParser {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final CookieDecrypter cookieDecrypter;
 
-    public AuthCookieParser(CookieDecrypter cookieDecrypter) {
+    public ProfileCookieParser(CookieDecrypter cookieDecrypter) {
         this.cookieDecrypter = cookieDecrypter;
     }
 
-    public AuthCookie parse(String rawCookie) {
+    public ProfileCookie parse(String rawCookie) {
         final String decryptedCookie = cookieDecrypter.decrypt(rawCookie);
         // Do stuff
-        final Map<String, String> values = extractValues(decryptedCookie);
-        String username = values.get("username");
-        // Take into account time zone
-        LocalDateTime issuedAt = LocalDateTime.parse(values.get("issued-at"));
-        Duration ttl = DurationStyle.detectAndParse(values.get("ttl"));
-        String sessionId = values.get("session-id");
+        final Map<String, Object> values = extractValues(decryptedCookie);
+        final List<Integer> allowedAppsId = (List<Integer>) values.get("app-ids");
 
-        return new AuthCookie(username, issuedAt, ttl, sessionId);
+        return new ProfileCookie(allowedAppsId);
     }
 
-    private Map<String, String> extractValues(String decryptedCookie) {
+    private Map<String, Object> extractValues(String decryptedCookie) {
         // do stuff
         // For example if the cookie contains a JSON token
         try {

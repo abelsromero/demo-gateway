@@ -16,10 +16,13 @@ import org.springframework.security.web.server.WebFilterChainProxy;
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class CustomAuthorizationGatewayFilterFactory
@@ -37,10 +40,26 @@ public class CustomAuthorizationGatewayFilterFactory
         this.authenticationManager = authenticationManager;
     }
 
+
+    private WebClient webClient;
+
     @Override
     public GatewayFilter apply(Config config) {
 
         var authenticationWebFilter = authenticationWebFilter();
+
+        /**
+         * In other filters, the Authentication can be retrieved from the Security Context:
+         *         ReactiveSecurityContextHolder.getContext()
+         *                 .map(securityContext -> {
+         *                     CookieAuthentication authentication = (CookieAuthentication)securityContext.getAuthentication();
+         *                     AuthCookie credentials = (AuthCookie)authentication.getCredentials();
+         *
+         *                     String sessionId = credentials.getSessionId();
+         *
+         *                 });
+         */
+
 
         // Use Spring Security DLS builder:
         //  * Disable unnecessary pieces
@@ -53,18 +72,35 @@ public class CustomAuthorizationGatewayFilterFactory
                 .csrf(csrfSpec -> csrfSpec.disable())
                 .logout(logoutSpec -> logoutSpec.disable())
                 .addFilterBefore(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-                .authorizeExchange(authorizeExchangeSpec -> authorizeExchangeSpec.anyExchange().authenticated())
+                .authorizeExchange(authorizeExchangeSpec -> {
+                    authorizeExchangeSpec
+                            // Authority implies authenticated, see AuthorityReactiveAuthorizationManager.
+                            // Alternatively, for complex scenarios, you can use `.access()`
+                            //
+                            //            .anyExchange().access((authentication, object) -> authentication.map(auth -> auth.isAuthenticated()
+                            //                    && auth.getAuthorities().stream()
+                            //                    .map(GrantedAuthority::getAuthority)
+                            //                    .anyMatch(authority -> authority.equals("APP_ALLOWED_" + config.id)))
+                            //                    .map(granted -> new AuthorizationDecision(granted)))
+                            .anyExchange().hasAuthority("APP_ALLOWED_" + config.appId);
+//                            .anyExchange().authenticated();
+                })
+
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
-                                .accessDeniedHandler((exchange, denied) -> {
-                                    ServerHttpResponse response = exchange.getResponse();
-                                    // For example only, `Location` should come with status 302
-                                    response.setRawStatusCode(600);
-                                    response.getHeaders().setLocation(URI.create("/url/to-redirect"));
-                                    // Customizing the response
-                                    DataBufferFactory dataBufferFactory = response.bufferFactory();
-                                    DataBuffer wrap = dataBufferFactory.wrap("error message".getBytes(StandardCharsets.UTF_8));
-                                    return response.writeWith(Mono.just(wrap));
-                                })
+                        .accessDeniedHandler((exchange, denied) -> {
+                            // TODO check if exception from manager is wrapper in AccessDenied
+                            //   denied.getCause();
+
+                            ServerHttpResponse response = exchange.getResponse();
+                            // For example only, `Location` should come with status 302
+                            response.setRawStatusCode(600);
+                            response.getHeaders().setLocation(URI.create("/url/to-redirect"));
+                            // Customizing the response
+                            DataBufferFactory dataBufferFactory = response.bufferFactory();
+                            DataBuffer wrap = dataBufferFactory.wrap("error message".getBytes(StandardCharsets.UTF_8));
+
+                            return response.writeWith(Mono.just(wrap));
+                        })
                 )
                 .build();
 
@@ -79,14 +115,19 @@ public class CustomAuthorizationGatewayFilterFactory
         return authenticationWebFilter;
     }
 
+    @Override
+    public List<String> shortcutFieldOrder() {
+        return Arrays.asList("appId");
+    }
+
     // Make the Config class immutable and validated: no need for getters and manual checks
     @Validated
     static class Config {
 
-        private final Integer id;
+        private final Integer appId;
 
         public Config(@NotNull Integer id) {
-            this.id = id;
+            this.appId = id;
         }
     }
 }
