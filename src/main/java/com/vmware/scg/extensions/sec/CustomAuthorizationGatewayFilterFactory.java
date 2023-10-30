@@ -21,6 +21,8 @@ import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class CustomAuthorizationGatewayFilterFactory
@@ -72,14 +74,16 @@ public class CustomAuthorizationGatewayFilterFactory
                 .addFilterBefore(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(authorizeExchangeSpec -> {
                     authorizeExchangeSpec
-                            // TODO authority implies authenticated, or alternatively for complex scenarios, you can use `.access()`
+                            // Authority implies authenticated, see AuthorityReactiveAuthorizationManager.
+                            // Alternatively, for complex scenarios, you can use `.access()`
                             //
                             //            .anyExchange().access((authentication, object) -> authentication.map(auth -> auth.isAuthenticated()
                             //                    && auth.getAuthorities().stream()
                             //                    .map(GrantedAuthority::getAuthority)
                             //                    .anyMatch(authority -> authority.equals("APP_ALLOWED_" + config.id)))
                             //                    .map(granted -> new AuthorizationDecision(granted)))
-                            .anyExchange().hasAuthority("APP_ALLOWED_" + config.id);
+                            .anyExchange().hasAuthority("APP_ALLOWED_" + config.appId);
+//                            .anyExchange().authenticated();
                 })
 
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
@@ -111,14 +115,19 @@ public class CustomAuthorizationGatewayFilterFactory
         return authenticationWebFilter;
     }
 
+    @Override
+    public List<String> shortcutFieldOrder() {
+        return Arrays.asList("appId");
+    }
+
     // Make the Config class immutable and validated: no need for getters and manual checks
     @Validated
     static class Config {
 
-        private final Integer id;
+        private final Integer appId;
 
         public Config(@NotNull Integer id) {
-            this.id = id;
+            this.appId = id;
         }
     }
 }
