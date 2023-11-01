@@ -16,7 +16,7 @@ import java.util.List;
 @Component
 class CookieAuthenticationConverter implements ServerAuthenticationConverter {
 
-    private static final Logger log = LoggerFactory.getLogger(CustomAuthorizationGatewayFilterFactory.class);
+    private static final Logger log = LoggerFactory.getLogger(CookieAuthenticationConverter.class);
 
     private static final String COOKIE_NAME = "auth-cookie";
 
