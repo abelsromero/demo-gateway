@@ -34,7 +34,7 @@ Likewise, validation/authentication logic could be extracted into an independent
 The filter expects a cookie names `auth-cookie` containing a Base64 encoded JSON content with some properties.
 
 .JSON content example
- {"username":"me","session-id":"123","issued-at":"2023-10-26T20:16:00.000","ttl":"24h"}
+ {"username":"me","session-id":"123","issued-at":"2023-11-11T10:16:00.000","ttl":"24h"}
 
 
 Simply, start the application `DemoGatewayApplication` and use one of the following curl calls:
@@ -46,8 +46,11 @@ http://localhost:8080/test/get -v
 This call responds with a successful status `200 OK` given the token hasn't expire
 
 .Example of expired
- curl --cookie "auth-cookie=eyJ1c2VybmFtZSI6Im1lIiwic2Vzc2lvbi1pZCI6IjEyMyIsImlzc3VlZC1hdCI6IjIwMjMtMTAtMjZUMjA6MTY6MDAuMDAwIiwidHRsIjoiMTBzIn0=" \
-http://localhost:8080/test/get -v
+----
+curl \
+  --cookie "auth-cookie=eyJ1c2VybmFtZSI6Im1lIiwic2Vzc2lvbi1pZCI6IjEyMyIsImlzc3VlZC1hdCI6IjIwMjMtMTEtMTFUMTA6MTY6MDAuMDAwIiwidHRsIjoiMjRoIn0=" \
+  http://localhost:8080/test/get -v
+----
 
 
 == Advanced
