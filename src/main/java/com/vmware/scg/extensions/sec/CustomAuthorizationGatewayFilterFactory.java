@@ -53,7 +53,9 @@ public class CustomAuthorizationGatewayFilterFactory
                 .csrf(csrfSpec -> csrfSpec.disable())
                 .logout(logoutSpec -> logoutSpec.disable())
                 .addFilterBefore(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-                .authorizeExchange(authorizeExchangeSpec -> authorizeExchangeSpec.anyExchange().authenticated())
+                .authorizeExchange(authorizeExchangeSpec -> {
+                    authorizeExchangeSpec.anyExchange().authenticated();
+                })
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
                                 .accessDeniedHandler((exchange, denied) -> {
                                     ServerHttpResponse response = exchange.getResponse();
